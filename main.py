@@ -9,7 +9,7 @@ app.include_router(router_tokens)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:8080"],  # URLs de Vue
+    allow_origins=["*"],  # URLs de Vue
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
