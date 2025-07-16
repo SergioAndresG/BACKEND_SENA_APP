@@ -122,6 +122,7 @@ async def obtener_aprendices(numero_ficha: str):
                 "apellido": aprendiz.apellido,
                 "celular": aprendiz.celular,
                 "correo": aprendiz.correo,
+                "estado": aprendiz.estado,
                 "tipo_documento": aprendiz.tipo_documento
             })
         
@@ -131,5 +132,41 @@ async def obtener_aprendices(numero_ficha: str):
             "aprendices": resultado
         }
     
+    finally:
+        session.close()
+        
+@router_tokens.get("/ficha/{numero_ficha}/aprendiz")
+async def obtener_aprendiz(numero_ficha: str, documento: str = None):
+    """
+    Obtener aprendiz de una ficha específica, filtrando por número de documento.
+    """
+    session = SessionLocal()
+    try:
+        query = session.query(Aprendiz).filter(Aprendiz.ficha_numero == numero_ficha)
+
+        if documento:
+            query = query.filter(Aprendiz.documento == documento)
+
+        aprendices = query.all()
+
+        if not aprendices:
+            raise HTTPException(status_code=404, detail="Aprendiz o ficha no encontrados")
+        
+        resultado = [{
+            "id": aprendiz.id_aprendiz,
+            "documento": aprendiz.documento,
+            "nombre": aprendiz.nombre,
+            "apellido": aprendiz.apellido,
+            "celular": aprendiz.celular,
+            "correo": aprendiz.correo,
+            "estado": aprendiz.estado,
+            "tipo_documento": aprendiz.tipo_documento
+        } for aprendiz in aprendices]
+
+        return {
+            "numero_ficha": numero_ficha,
+            "total_aprendices": len(resultado),
+            "aprendices": resultado
+        }
     finally:
         session.close()
