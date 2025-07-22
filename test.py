@@ -12,6 +12,54 @@ from pathlib import Path
 class TestClient:
     def __init__(self, base_url="http://localhost:8000"):
         self.base_url = base_url
+
+    def subir_archivo_maestro(self, ruta_archivo):
+        """Sube el archivo maestro mensual al servidor"""
+        print(f"📅 Subiendo archivo maestro: {ruta_archivo}")
+        
+        if not os.path.exists(ruta_archivo):
+            print(f"❌ Archivo maestro no encontrado: {ruta_archivo}")
+            return None
+        
+        try:
+            with open(ruta_archivo, 'rb') as archivo:
+                files = {'archivo': (os.path.basename(ruta_archivo), archivo, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')}
+                
+                response = requests.post(f"{self.base_url}/upload-archivo-maestro/", files=files)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    print(f"✅ Archivo maestro subido exitosamente!")
+                    print(f"   📊 Task ID: {data['task_id']}")
+                    return data['task_id']
+                else:
+                    print(f"❌ Error subiendo archivo maestro: {response.text}")
+                    return None
+                
+        except requests.exceptions.ConnectionError:
+            print("❌ No se pudo conectar al servidor. ¿Está ejecutándose FastAPI?")
+            return None
+    
+    def verificar_archivo_maestro(self):
+        """Verifica si ya existe un archivo maestro cargado"""
+        try:
+            response = requests.get(f"{self.base_url}/archivo-maestro/status")
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('existe', False):
+                    print(f"✅ Archivo maestro ya existe (cargado: {data.get('fecha_carga', 'N/A')})")
+                    return True
+                else:
+                    print("⚠️  No hay archivo maestro cargado")
+                    return False
+            else:
+                print("⚠️  No se pudo verificar el archivo maestro")
+                return False
+                
+        except requests.exceptions.ConnectionError:
+            print("❌ No se pudo conectar al servidor")
+            return False
     
     def subir_archivos(self, rutas_archivos):
         """Sube múltiples archivos Excel al servidor"""
@@ -146,18 +194,35 @@ def main():
     print("=" * 50)
     
     client = TestClient()
+
+
+    archivo_maestro = 'PE-04_1 a junio 2025.xlsx'
+
+    print("\n📅 PASO 1: Verificando archivo maestro...")
+    if not client.verificar_archivo_maestro():
+        print("🚀 Cargando archivo maestro...")
+        task_id_maestro = client.subir_archivo_maestro(archivo_maestro)
+        
+        if task_id_maestro:
+            print("⏳ Esperando que termine el archivo maestro...")
+            client.monitorear_progreso(task_id_maestro)
+        else:
+            print("❌ No se pudo cargar el archivo maestro")
+            return
     
     # 1. Configurar archivos de prueba
+    print("\n📚 PASO 2: Procesando archivos de fichas...")
     archivos_test = [
         "Reporte-de-Aprendices-Ficha-3147272.xlsx",
         "Reporte-de-Aprendices-Ficha-3147190.xlsx",
     ]
-    
+ 
     for archivo in archivos_test:
         print(archivo, "=>", os.path.exists(archivo))  
 
     # Filtrar solo archivos existentes
     archivos_existentes = [f for f in archivos_test if os.path.exists(f)]
+   
     
     if not archivos_existentes:
         print("❌ No se encontraron archivos Excel para probar")

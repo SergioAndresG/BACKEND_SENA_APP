@@ -1,4 +1,4 @@
-from FUNCIONES import ProcesadorArchivos
+from FUNCIONES import ProcesadorArchivos, ProcesadorArchivoMaestro
 from datetime import datetime
 from typing import List
 import asyncio

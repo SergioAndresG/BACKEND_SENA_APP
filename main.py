@@ -2,14 +2,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from connection import base, crear
-from EDNPOINTS.tokens import router_tokens
+from EDNPOINTS.fichas import router_tokens
 
 app = FastAPI(title="SENA - Procesador de Fichas")
 app.include_router(router_tokens)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:8080"],  # URLs de Vue
+    allow_origins=["*"],  # URLs de Vue
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
