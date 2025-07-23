@@ -2,10 +2,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from connection import base, crear
-from EDNPOINTS.tokens import router_tokens
+from EDNPOINTS.fichas import router_tokens
+from EDNPOINTS.formatos import router_format
 
 app = FastAPI(title="SENA - Procesador de Fichas")
 app.include_router(router_tokens)
+app.include_router(router_format)
+
+
+
 
 app.add_middleware(
     CORSMiddleware,
