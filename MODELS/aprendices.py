@@ -11,6 +11,7 @@ class Aprendiz(base):
     apellido = Column(String(100), nullable=False)  
     correo = Column(String(100), nullable=False)    
     celular = Column(String(20), nullable=False)
+    direccion = Column(String(200), nullable=True)
     tipo_documento = Column(String(10), nullable=True)  
     estado = Column(String(50), nullable=True)
 
