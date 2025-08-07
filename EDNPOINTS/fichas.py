@@ -1,9 +1,14 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, APIRouter
-from MODELS import Aprendiz, Ficha
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, APIRouter, Depends
+from fastapi.responses import FileResponse
+from MODELS import Aprendiz, Ficha, ArchivoExcel
+from sqlalchemy.orm import Session
+from connection import get_db
+from SCHEMAS.aprendiz_schemas import ExportarF165Request
 from FUNCIONES import procesar_archivos_background, procesar_archivo_maestro_background
 from connection import SessionLocal
 from typing import List
 import uuid
+import os
 
 router_tokens = APIRouter()
 
@@ -112,46 +117,64 @@ async def listar_fichas():
         session.close()
 
 @router_tokens.get("/ficha/{numero_ficha}/aprendices")
-async def obtener_aprendices(numero_ficha: str):
+async def obtener_aprendices(numero_ficha: str, db: Session = Depends(get_db)):
     """
     Obtener aprendices de una ficha específica
-    """
-    session = SessionLocal()
+    """    
     try:
 
         # Buscar la ficha
-        ficha = session.query(Ficha).filter(Ficha.numero_ficha == numero_ficha).first()
+        ficha = db.query(Ficha).filter(Ficha.numero_ficha == numero_ficha).first()
 
-        if not ficha:
-            HTTPException(status_code=404, detail="La ficha no existe")
+        # Verificar si ya existe un archivo para la ficha buscada
+        archivo_existente = db.query(ArchivoExcel).filter(
+            ArchivoExcel.ficha == numero_ficha,
+        ).first()
 
-        aprendices = session.query(Aprendiz).filter(
-            Aprendiz.ficha_numero == numero_ficha
-        ).all()
-        
-        if not aprendices:
-            raise HTTPException(status_code=404, detail="Ficha no encontrada")
-        
-        resultado = []
-        for aprendiz in aprendices:
-            resultado.append({
-                "id": aprendiz.id_aprendiz,
-                "documento": aprendiz.documento,
-                "nombre": aprendiz.nombre,
-                "apellido": aprendiz.apellido,
-                "celular": aprendiz.celular,
-                "correo": aprendiz.correo,
-                "tipo_documento": aprendiz.tipo_documento,
-                "estado": aprendiz.estado
-            })
-        
-        return {
-            "numero_ficha": numero_ficha,
-            "total_aprendices": len(resultado),
-            "fecha_inicio": ficha.fecha_inicio.isoformat() if ficha.fecha_inicio else None,
-            "fecha_fin": ficha.fecha_fin.isoformat() if ficha.fecha_inicio else None,
-            "aprendices": resultado
-        }
-    
+        if archivo_existente:
+            aprendices = db.query(Aprendiz).filter(
+                Aprendiz.ficha_numero == numero_ficha
+            ).all()
+            
+            resultado = []
+            for aprendiz in aprendices:
+                resultado.append({
+                    "id": aprendiz.id_aprendiz,
+                    "documento": aprendiz.documento,
+                    "nombre": aprendiz.nombre,
+                    "apellido": aprendiz.apellido,
+                    "celular": aprendiz.celular,
+                    "correo": aprendiz.correo,
+                    "direccion": aprendiz.direccion,
+                    "tipo_documento": aprendiz.tipo_documento,
+                    "estado": aprendiz.estado
+                })
+            
+            return {
+                "numero_ficha": numero_ficha,
+                "total_aprendices": len(resultado),
+                "fecha_inicio": ficha.fecha_inicio.isoformat() if ficha.fecha_inicio else None,
+                "fecha_fin": ficha.fecha_fin.isoformat() if ficha.fecha_inicio else None,
+                "aprendices": resultado,
+                "archivo_existente": True
+            }
+        else:
+            aprendices = db.query(Aprendiz).filter(
+                Aprendiz.ficha_numero == numero_ficha
+            ).all()
+            return {"archivo_existente": False, "aprendices": aprendices}
+            
     finally:
-        session.close()
+        db.close()
+
+@router_tokens.get("/descargar-archivo")
+def descargar_archivo(ruta: str):
+    if not os.path.isfile(ruta):
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+
+    nombre_archivo = os.path.basename(ruta)
+    return FileResponse(
+        path=ruta,
+        filename=nombre_archivo,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
