@@ -1,8 +1,9 @@
 from connection import crear, get_db, base, SessionLocal
-from MODELS import Ficha, Aprendiz
+from MODELS import Ficha, Aprendiz, FichaMaestro
 from datetime import datetime
 from typing import List
 import polars as pl
+import pandas as pd
 import tempfile
 import os
 import asyncio
@@ -10,6 +11,25 @@ import asyncio
 class ProcesadorArchivos:
     def __init__(self):
         self.session = SessionLocal()
+        self.fichas_maestro_cache = None
+
+    def _cargar_fechas_maestro(self):
+        """Carga las fechas del maestro en cache para procesamiento rápido"""
+        if self.fichas_maestro_cache is None:
+            try:
+                fichas_maestro = self.session.query(FichaMaestro).all()
+                self.fechas_maestro_cache = {
+                    ficha.numero_ficha: {
+                        'fecha_inicio': ficha.fecha_inicio,
+                        'fecha_fin': ficha.fecha_fin
+                    }
+                    for ficha in fichas_maestro
+                }
+                print(f"✅ Cache de fechas maestro cargado: {len(self.fechas_maestro_cache)} fichas")
+            except Exception as e:
+                print(f"⚠️ Error cargando fechas maestro: {e}")
+                self.fechas_maestro_cache = {}
+        return self.fechas_maestro_cache
     
     def procesar_archivo_individual(self, archivo_bytes: bytes, nombre_archivo: str):
         """Procesa un archivo Excel individual"""
@@ -19,7 +39,6 @@ class ProcesadorArchivos:
                 temp_file.write(archivo_bytes)
                 temp_path = temp_file.name
 
-            # ✅ CORREGIR: Leer archivo Excel sin parámetros no válidos
             # Nota: read_excel en versiones recientes de Polars no acepta read_csv_options
             df = pl.read_excel(temp_path)
             print("DataFrame completo shape:", df.shape)
@@ -34,8 +53,7 @@ class ProcesadorArchivos:
             cabecera = df.slice(0, 4).to_numpy()
             print("Cabecera extraída:", cabecera)
 
-            # ✅ CORREGIR: Obtener nombres de columna reales desde la fila 4 (índice 3) de la cabecera
-            # Los nombres están en cabecera[3], no en df.row(4)
+            # Obtener nombres de columna reales desde la fila 4
             nombres_columnas = [str(col).strip() for col in cabecera[3] if col is not None and str(col).strip() != '']
             
             print("Nombres de columnas extraídos:", nombres_columnas)
@@ -52,7 +70,7 @@ class ProcesadorArchivos:
                 print("✅ Todas las columnas requeridas están presentes")
 
             # Extraer datos desde la fila 6 (índice 5)
-            df_datos = df.slice(5)
+            df_datos = df.slice(4)
             
             print("✅ DataFrame de datos configurado:")
             print("   Shape original:", df_datos.shape)
@@ -113,80 +131,103 @@ class ProcesadorArchivos:
             }
 
     def _procesar_datos(self, df: pl.DataFrame, cabecera: list):
-        """Procesa y guarda datos en BD - SOLO POLARS"""
+        """Procesa datos usando el enfoque híbrido - AQUÍ ESTÁ LA MAGIA"""
         fichas_creadas = 0
         aprendices_creados = 0
 
         try:
-            # 🔍 DEBUG: Ver qué contiene la cabecera
-            print("🔍 Cabecera completa:")
-            for i, fila in enumerate(cabecera):
-                print(f"   Fila {i}: {fila}")
+            # PASO 1: Cargar fechas maestro al inicio
+            print("🔄 Cargando fechas maestro...")
+            fechas_maestro = self._cargar_fechas_maestro()
+            print(f"✅ Fechas maestro disponibles para {len(fechas_maestro)} fichas")
+            print("📦 Cache cargado:")
 
-            # ✅ EXTRAER METADATOS: Mejorar la extracción de datos de la cabecera
+            # PASO 2: Extraer metadatos (sin cambios)
+            print("🔍 Extrayendo metadatos de cabecera...")
             numero_ficha = ""
             estado_ficha = ""
             fecha_reporte = None
             
-            # Buscar información en todas las filas de la cabecera
             for i, fila in enumerate(cabecera):
                 fila_str = " ".join([str(cell) for cell in fila if cell is not None])
-                print(f"   Procesando fila {i}: {fila_str}")
                 
-                # Buscar número de ficha
                 if "ficha" in fila_str.lower() and not numero_ficha:
-                    # Buscar patrón de números en la cadena
                     import re
-                    match = re.search(r'(\d{7})', fila_str)  # Buscar 7 dígitos
+                    match = re.search(r'(\d{7})\s*-\s*(.*)', fila_str)
                     if match:
                         numero_ficha = match.group(1)
+                        nombre_programa = match.group(2).strip()
                         print(f"   ✅ Número de ficha encontrado: {numero_ficha}")
+                        print(f"   ✅ Nombre del programa encontrado: {nombre_programa}")
                 
-                # Buscar estado
                 if "estado" in fila_str.lower() and not estado_ficha:
                     partes = fila_str.split(":")
                     if len(partes) > 1:
                         estado_ficha = partes[1].strip()
                         print(f"   ✅ Estado encontrado: {estado_ficha}")
                 
-                # Buscar fecha
                 if "fecha" in fila_str.lower() and not fecha_reporte:
                     import re
-                    # Buscar patrón de fecha DD/MM/YYYY
                     match = re.search(r'(\d{1,2}/\d{1,2}/\d{4})', fila_str)
                     if match:
                         fecha_str = match.group(1)
                         fecha_reporte = self._convertir_fecha(fecha_str)
                         print(f"   ✅ Fecha encontrada: {fecha_reporte}")
 
-            print(f"📋 Metadatos extraídos:")
-            print(f"   🔢 Número ficha: '{numero_ficha}'")
-            print(f"   📊 Estado: '{estado_ficha}'") 
-            print(f"   📅 Fecha: {fecha_reporte}")
-
-            # ✅ VALIDAR: Que el número de ficha no esté vacío
             if not numero_ficha or numero_ficha.strip() == "":
                 raise ValueError("❌ No se pudo extraer el número de ficha de la cabecera")
 
-            # Crear o verificar ficha
+            print(f"📋 Metadatos extraídos - Ficha: {numero_ficha}, Estado: {estado_ficha}, Fecha: {fecha_reporte}")
+
+            #  PASO 3: Crear/verificar ficha CON BÚSQUEDA AUTOMÁTICA DE FECHAS
             ficha_existente = self.session.query(Ficha).filter(Ficha.numero_ficha == numero_ficha).first()
 
             if not ficha_existente:
+                # Buscar fechas automáticamente
+                fechas_ficha = fechas_maestro.get(numero_ficha, {})
+                fecha_inicio_maestro = fechas_ficha.get('fecha_inicio')
+                fecha_fin_maestro = fechas_ficha.get('fecha_fin')
+                
+                if fecha_inicio_maestro and fecha_fin_maestro:
+                    print(f"✅ Fechas encontradas en maestro para ficha {numero_ficha}: {fecha_inicio_maestro} - {fecha_fin_maestro}")
+                else:
+                    print(f"⚠️  No se encontraron fechas en maestro para ficha {numero_ficha}")
+
                 nueva_ficha = Ficha(
                     numero_ficha=numero_ficha,
-                    programa="CURSO INTRODUCTORIO A LA FORMACIÓN PROFESIONAL INTEGRAL",
+                    programa=nombre_programa,
                     estado=estado_ficha or "DESCONOCIDO",
+                    fecha_inicio=fecha_inicio_maestro,
+                    fecha_fin=fecha_fin_maestro,
                     fecha_reporte=fecha_reporte
                 )
                 self.session.add(nueva_ficha)
                 fichas_creadas += 1
-                print(f"✅ Nueva ficha creada: {numero_ficha}")
+                
+                if fecha_inicio_maestro and fecha_fin_maestro:
+                    print(f"✅ Ficha {numero_ficha} creada CON fechas del maestro")
+                else:
+                    print(f"✅ Ficha {numero_ficha} creada SIN fechas (no está en maestro)")
 
-            # 🔥 POLARS: Mapear columnas a nombres estándar para la base de datos
-            columnas_actuales = df.columns
-            print(f"📊 Columnas actuales en DataFrame: {columnas_actuales}")
+            else:
+                # 🚨 Aquí complementas para actualizar fechas si están vacías
+                fechas_ficha = fechas_maestro.get(numero_ficha, {})
+                fecha_inicio_maestro = fechas_ficha.get('fecha_inicio')
+                fecha_fin_maestro = fechas_ficha.get('fecha_fin')
+
+                if not ficha_existente.fecha_inicio and fecha_inicio_maestro:
+                    ficha_existente.fecha_inicio = fecha_inicio_maestro
+                    print(f"🛠 Fecha inicio actualizada desde maestro para ficha {numero_ficha}")
+                if not ficha_existente.fecha_fin and fecha_fin_maestro:
+                    ficha_existente.fecha_fin = fecha_fin_maestro
+                    print(f"🛠 Fecha fin actualizada desde maestro para ficha {numero_ficha}")
+
+
+            # PASO 4: Procesar aprendices (sin cambios)
+            print(f"👥 Procesando aprendices...")
             
-            # Mapeo directo de columnas
+            # Mapear columnas
+            columnas_actuales = df.columns
             mapeo_columnas = {}
             for col in columnas_actuales:
                 col_lower = col.lower().replace(" ", "").replace("de", "").replace("ó", "o")
@@ -202,35 +243,24 @@ class ProcesadorArchivos:
                     mapeo_columnas[col] = "celular"
                 elif "correo" in col_lower or "email" in col_lower:
                     mapeo_columnas[col] = "correo"
-                elif "estado" in col_lower or "estado" in col_lower:
+                elif "estado" in col_lower:
                     mapeo_columnas[col] = "estado"
             
-            print(f"📋 Mapeo de columnas: {mapeo_columnas}")
-            
-            # Renombrar solo las columnas que pudimos mapear
             if mapeo_columnas:
                 df = df.rename(mapeo_columnas)
-                print(f"✅ Columnas renombradas: {df.columns}")
-            else:
-                print("⚠️  No se pudo mapear ninguna columna, usando nombres originales")
 
-            # 🔥 POLARS: Agregar columna de ficha
+            # Agregar columna de ficha
             df = df.with_columns([
                 pl.lit(numero_ficha).alias("ficha_numero")
             ])
 
-            print(f"📊 Procesando {df.height} filas de aprendices...")
-
-            # 🔥 POLARS: Procesar datos fila por fila
+            # Procesar cada aprendiz
             for i in range(df.height):
                 try:
-                    # Obtener la fila actual
                     fila = df.row(i, named=True)
                     
-                    # Validar documento
                     documento_str = str(fila.get("documento", "")).strip() if fila.get("documento") is not None else ""
                     if not documento_str or documento_str in ["", "nan", "None", "null"]:
-                        print(f"⚠️  Fila {i+1}: Saltando por documento vacío")
                         continue
 
                     # Verificar si ya existe
@@ -240,7 +270,6 @@ class ProcesadorArchivos:
                     ).first()
 
                     if not aprendiz_existente:
-                        # ✅ CREAR APRENDIZ: Validación y limpieza de datos
                         nuevo_aprendiz = Aprendiz(
                             ficha_numero=numero_ficha,
                             tipo_documento=str(fila.get("tipo_documento", "CC")).strip(),
@@ -254,29 +283,21 @@ class ProcesadorArchivos:
                         self.session.add(nuevo_aprendiz)
                         aprendices_creados += 1
                         
-                        if aprendices_creados % 10 == 0:  # Log cada 10 aprendices
+                        if aprendices_creados % 10 == 0:
                             print(f"📝 Creados {aprendices_creados} aprendices...")
                             
-                    else:
-                        print(f"⚠️  Aprendiz {documento_str} ya existe en ficha {numero_ficha}")
-                        
                 except Exception as row_error:
                     print(f"❌ Error procesando fila {i+1}: {row_error}")
-                    continue  # Continuar con la siguiente fila
+                    continue
 
-            # ✅ COMMIT con manejo de errores
-            try:
-                self.session.commit()
-                print(f"✅ Commit exitoso: {fichas_creadas} fichas, {aprendices_creados} aprendices creados")
-                return fichas_creadas, aprendices_creados
-            except Exception as commit_error:
-                self.session.rollback()
-                print(f"❌ Error en commit: {commit_error}")
-                raise commit_error
+            # Commit final
+            self.session.commit()
+            print(f"✅ Procesamiento completado: {fichas_creadas} fichas, {aprendices_creados} aprendices")
+            return fichas_creadas, aprendices_creados
                 
         except Exception as e:
             self.session.rollback()
-            print(f"❌ Error general en _procesar_datos: {str(e)}")
+            print(f"❌ Error en _procesar_datos_hibrido: {str(e)}")
             import traceback
             traceback.print_exc()
             raise e
