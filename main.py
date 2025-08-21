@@ -5,14 +5,19 @@ from connection import base, crear
 from EDNPOINTS.fichas import router_tokens
 from EDNPOINTS.formatos import router_format
 from EDNPOINTS.aprendices import router_aprendices
+from EDNPOINTS.login import router_login
 
 from MODELS.a_usuarios import Usuarios
 from MODELS.archivo_excel import ArchivoExcel
+
+
+from MIDELWARE.security_middleware import SecurityMiddleware
 
 app = FastAPI(title="SENA - Procesador de Fichas")
 app.include_router(router_tokens)
 app.include_router(router_format)
 app.include_router(router_aprendices)
+app.include_router(router_login)
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,6 +26,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Agregar middleware de seguridad
+app.add_middleware(SecurityMiddleware, max_requests_per_minute=100)
+
 
 base.metadata.create_all(bind=crear)
 
