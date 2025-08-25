@@ -18,6 +18,10 @@ class ArchivoExcel(base):
     ficha = Column(String(20), nullable=False)  # Número de ficha asociado
     modalidad = Column(String(50), nullable=False)  # Modalidad del archivo (grupal, individual, etc.)
     cantidad_aprendices = Column(BigInteger, nullable=False)  # Cantidad de aprendices en el archivo
+    
+    # Relación individual con aprendiz vía documento
+    aprendiz_documento = Column(String(20), ForeignKey("Aprendices.documento"), nullable=True)
+    aprendiz = relationship("Aprendiz", back_populates="archivos_excel")
 
     #Seguridad y validación
     hash_archivo = Column(String(64), nullable=False)  # Hash del archivo para verificar integridad
