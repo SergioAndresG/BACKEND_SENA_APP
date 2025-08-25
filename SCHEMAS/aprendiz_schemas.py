@@ -9,6 +9,8 @@ class AprendizParaExportar(BaseModel):
     nombre: str
     apellido: str
     direccion: str
+    departamento: Optional[str] = None
+    municipio: Optional[str] = None
     correo: str
     celular: str
     discapacidad: str
@@ -22,6 +24,8 @@ class AprendizActualizarRequest(BaseModel):
     nombre: Optional[str] = None
     apellido: Optional[str] = None
     direccion: Optional[str] = None
+    departamento: Optional[str] = None
+    municipio: Optional[str] = None
     correo: Optional[str] = None
     celular: Optional[str] = None
     discapacidad: Optional[str] = None
