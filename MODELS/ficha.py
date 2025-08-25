@@ -10,5 +10,9 @@ class Ficha(base):
     fecha_inicio = Column(Date, nullable=True)
     fecha_fin = Column(Date, nullable=True)
     fecha_reporte = Column(Date, nullable=True)
+    fecha_inicio_prod = Column(Date, nullable=True)
+    trimeste = Column(String(50), nullable=True)
+    jornada = Column(String(50), nullable=True)
+    modalidad = Column(String(50), nullable=True)
 
     aprendices = relationship("Aprendiz", back_populates="ficha")
