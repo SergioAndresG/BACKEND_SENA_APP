@@ -12,7 +12,6 @@ import os
 
 router_tokens = APIRouter()
 
-
 procesamiento_estado = {}
 
 @router_tokens.post("/upload-fichas/")
@@ -164,6 +163,59 @@ async def obtener_aprendices(numero_ficha: str, db: Session = Depends(get_db)):
             ).all()
             return {"archivo_existente": False, "aprendices": aprendices}
             
+    finally:
+        db.close()
+
+@router_tokens.get("/individual/{numero_ficha}/{numero_documento}")
+async def obtener_aprendiz(
+    numero_ficha: str, 
+    numero_documento: str, 
+    db: Session = Depends(get_db)
+):
+    """
+    Obtener aprendiz de una ficha con documento específico
+    """    
+    try:
+        # Buscar la ficha
+        ficha = db.query(Ficha).filter(Ficha.numero_ficha == numero_ficha).first()
+        if not ficha:
+            return {"error": f"No existe ficha con número {numero_ficha}"}
+
+        # Buscar aprendiz dentro de la ficha
+        aprendiz = db.query(Aprendiz).filter(
+            Aprendiz.ficha_numero == numero_ficha,
+            Aprendiz.documento == numero_documento
+        ).first()
+
+        if not aprendiz:
+            return {"error": f"No se encontró aprendiz con documento {numero_documento} en la ficha {numero_ficha}"}
+
+        # Verificar si ya existe un archivo para la ficha
+        archivo_existente = db.query(ArchivoExcel).filter(
+            ArchivoExcel.ficha == numero_ficha,
+            ArchivoExcel.aprendiz_documento == numero_documento
+        ).first()
+
+        # Preparar respuesta
+        resultado = {
+            "id": aprendiz.id_aprendiz,
+            "documento": aprendiz.documento,
+            "nombre": aprendiz.nombre,
+            "apellido": aprendiz.apellido,
+            "celular": aprendiz.celular,
+            "correo": aprendiz.correo,
+            "direccion": aprendiz.direccion,
+            "tipo_documento": aprendiz.tipo_documento,
+            "estado": aprendiz.estado
+        }
+
+        return {
+            "numero_ficha": numero_ficha,
+            "fecha_inicio": ficha.fecha_inicio.isoformat() if ficha.fecha_inicio else None,
+            "fecha_fin": ficha.fecha_fin.isoformat() if ficha.fecha_fin else None,
+            "aprendiz": resultado,
+            "archivo_existente": archivo_existente is not None
+        }
     finally:
         db.close()
 
