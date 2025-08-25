@@ -18,6 +18,8 @@ import tempfile
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from openpyxl.styles import Font 
+from openpyxl import Workbook
+from openpyxl.drawing.image import Image as OpenpyxlImage
 
 router_format = APIRouter()
 
@@ -32,8 +34,7 @@ async def exportar_f165(request: ExportarF165Request, db: Session = Depends(get_
 
     ficha = db.query(Ficha).filter(Ficha.numero_ficha == request.ficha).first()
     if not ficha:
-        raise HTTPException(status_code=404, detail="Ficha no encontrada")
-        
+        raise HTTPException(status_code=404, detail="Ficha no encontrada")  
 
     #1. Validaciones
     if not request.aprendices:
@@ -43,12 +44,10 @@ async def exportar_f165(request: ExportarF165Request, db: Session = Depends(get_
     aprendices = request.aprendices # Lista de aprendices a exportar
     usuario_gene = request.usuario_generator # Usuario que genera el archivo
 
-
     usuario = db.query(Usuarios).filter(
         Usuarios.nombre == usuario_gene.nombre, 
         Usuarios.apellidos == usuario_gene.apellidos
     ).first()
-
 
     if not usuario:
         usuario = Usuarios(
@@ -61,7 +60,6 @@ async def exportar_f165(request: ExportarF165Request, db: Session = Depends(get_
         db.add(usuario)
         db.commit()
         db.refresh(usuario)
-
 
     else:
         # Si no existe, continuar con la generación del archivo
@@ -106,93 +104,161 @@ async def exportar_f165(request: ExportarF165Request, db: Session = Depends(get_
         wb = load_workbook(ruta_archivo) # Cargar el archivo de Excel .xlsx
     except FileNotFoundError:
         raise HTTPException(status_code=404,detail="Archivo no encontrado")
-
-    # Selección de hoja según modalidad
-    if modalidad == "grupal":
-        hoja = wb["Selección formato 1 - Grupal"]
-    elif modalidad == "individual":
-        hoja = wb["Selección Modificación F2 Indiv"]
-    else:
-        raise HTTPException(status_code=400, detail="Modalidad no válida")
     
     fecha_inicio = ficha.fecha_inicio.strftime("%d-%m-%Y") if ficha.fecha_inicio else "N/A"
     fecha_fin = ficha.fecha_fin.strftime("%d-%m-%Y") if ficha.fecha_fin else "N/A"
 
     fecha_actual = datetime.now().strftime("%d-%m-%Y")
 
-    datos_fechas = {
-        "E13": fecha_inicio,
-        "H13": fecha_fin,
-        "H14": fecha_fin, 
-        "E11": fecha_actual
-    }
-
-    # Aplicar todo de una vez
-    font_style = Font(size=12, bold=True)
-    for celda, valor in datos_fechas.items():
-        hoja[celda] = valor
-        hoja[celda].font = font_style
-    hoja["T11"] = request.ficha  # Número de ficha
-
-    nombre_completo_instructor = f"{usuario.nombre} {usuario.apellidos}"
-
-    correo_instructor = usuario.correo
-    
+    # Selección de hoja según modalidad
     if modalidad == "grupal":
-        hoja["T13"] = nombre_completo_instructor  # Instructor
-        hoja["T14"] = correo_instructor  # Correo
-
-
-
-    fila_inicial = 18 # Los datos empiezan en la fila 18
-    espacios_disponibles = 20 # La plantilla tiene 20 espacios
-    aprendices_extra = len(aprendices) - espacios_disponibles
-
-    # Inserta filas si hay más aprendices que espacios
-    if aprendices_extra > 0:
-        hoja.insert_rows(idx=fila_inicial + espacios_disponibles, amount=aprendices_extra)
-
-    # Llenar datos de forma optimizada
-    for i, (ap, imagen_path) in enumerate(zip(aprendices, imagenes_procesadas)):
-        fila = fila_inicial + i
+        hoja = wb["Selección formato 1 - Grupal"]
         
-        # Escribir todos los datos de texto de una vez
-        datos_fila = [
-            (f"C{fila}", ap.tipo_documento),
-            (f"D{fila}", ap.documento),
-            (f"E{fila}", ap.nombre),
-            (f"F{fila}", ap.apellido),
-            (f"G{fila}", ap.direccion),
-            (f"H{fila}", ap.correo),
-            (f"I{fila}", ap.celular),
-            (f"L{fila}", ap.tipo_discapacidad),
-            (f"M{fila}", "x")
-        ]
+        hoja["E8"] = "x"
         
-        for celda, valor in datos_fila:
+        hoja["E12"] = "25 / CUNDINAMARCA"
+        hoja["H12"] = "9512 / CENTRO DE BIOTECNOLOGIA AGROPECUARIA"
+        
+        datos_fechas = {
+            "E13": fecha_inicio,
+            "H13": fecha_fin,
+            "H14": fecha_fin, 
+            "E11": fecha_actual
+        }
+
+        # Aplicar todo de una vez
+        font_style = Font(size=12, bold=True)
+        for celda, valor in datos_fechas.items():
             hoja[celda] = valor
+            hoja[celda].font = font_style
+        hoja["T11"] = request.ficha  # Número de ficha
         
-        # Manejar discapacidad
+        hoja["H11"] = f"Técnico {ficha.programa}"
+
+        nombre_completo_instructor = f"{usuario.nombre} {usuario.apellidos}"
+
+        correo_instructor = usuario.correo
+        
+        hoja["T13"] = nombre_completo_instructor  # Instructor
+        hoja["U14"] = correo_instructor  # Correo
+
+        fila_inicial = 18 # Los datos empiezan en la fila 18
+        espacios_disponibles = 20 # La plantilla tiene 20 espacios
+        aprendices_extra = len(aprendices) - espacios_disponibles
+
+        # Inserta filas si hay más aprendices que espacios
+        if aprendices_extra > 0:
+            hoja.insert_rows(idx=fila_inicial + espacios_disponibles, amount=aprendices_extra)
+
+        # Llenar datos de forma optimizada
+        for i, (ap, imagen_path) in enumerate(zip(aprendices, imagenes_procesadas)):
+            fila = fila_inicial + i
+            
+            # Escribir todos los datos de texto de una vez
+            datos_fila = [
+                (f"C{fila}", ap.tipo_documento),
+                (f"D{fila}", ap.documento),
+                (f"E{fila}", ap.nombre),
+                (f"F{fila}", ap.apellido),
+                (f"G{fila}", ap.direccion),
+                (f"H{fila}", ap.correo),
+                (f"I{fila}", ap.celular),
+                (f"L{fila}", ap.tipo_discapacidad),
+                (f"M{fila}", "x")
+            ]
+            
+            for celda, valor in datos_fila:
+                hoja[celda] = valor
+            
+            # Manejar discapacidad
+            if ap.discapacidad == 'No':
+                hoja[f"K{fila}"] = "x"
+            else:
+                hoja[f"J{fila}"] = "x"
+
+            # Ajustar tamaño de columna y fila
+            hoja.row_dimensions[fila].height = 40     # alto de la fila
+
+            if imagen_path:
+                try:
+                    img = OpenpyxlImage(imagen_path)
+                    img.width = 80
+                    img.height = 30
+
+                    # Insertar la imagen en la celda AG{fila}
+                    celda = f"AG{fila}"
+                    hoja.add_image(img, celda)
+
+                except Exception as e:
+                    print(f"Error insertando imagen en fila {fila}: {e}")
+
+    elif modalidad == "individual":
+        hoja = wb["Selección Modificación F2 Indiv"]
+        hoja["C8"] = "x"
+
+        # Tomar el primer (y único) aprendiz
+        ap = aprendices[0]
+        imagen_path = imagenes_procesadas[0] if imagenes_procesadas else None
+
+        # Datos del aprendiz
+        hoja["C12"] = ap.tipo_documento
+        hoja["D12"] = ap.documento
+        hoja["E12"] = f"{ap.nombre} {ap.apellido}"
+        hoja["F12"] = ap.celular
+        hoja["G12"] = ap.correo
+        hoja["B14"] = ap.direccion
+        hoja["C14"] = ap.departamento
+        hoja["D14"] = ap.municipio
+
         if ap.discapacidad == 'No':
-            hoja[f"K{fila}"] = "x"
+            hoja["E14"] = "Si   (  )   No   ( X )"
         else:
-            hoja[f"J{fila}"] = "x"
-        
-        # Insertar imagen si se procesó correctamente
+            hoja["E14"] = "Si   ( X )   No   (  )"  
+
+        hoja["G14"] = ap.tipo_discapacidad
+        hoja["B17"] = "25 / CUNDINAMARCA"
+        hoja["C17"] = "9512 / CENTRO DE BIOTECNOLOGIA AGROPECUARIA"
+        hoja["E17"] = request.ficha
+        hoja["F17"] = f"Técnico"
+        hoja["G17"] = ficha.programa
+        hoja["E19"] = "Selección de alternativa: ( X )"
+
+        datos_fechas = {
+            "C19": fecha_inicio,
+            "D19": fecha_fin,
+            "H19": fecha_fin,
+            "B12": fecha_actual
+        }
+        for celda, valor in datos_fechas.items():
+            hoja[celda] = valor
+
+        hoja["D22"] = "X"
+        hoja["F30"] = f"{ap.nombre} {ap.apellido}"
+
+        # Firma (imagen)
         if imagen_path:
             try:
                 img = OpenpyxlImage(imagen_path)
                 img.width = 80
                 img.height = 30
-                img.anchor = f"AG{fila}"
-                hoja.add_image(img)
+                hoja.add_image(img, "G30")  # Aquí va como string, no lista
             except Exception as e:
-                print(f"Error insertando imagen en fila {fila}: {e}")
-
+                print(f"Error insertando imagen en hoja individual: {e}")
+            
+    else:
+        raise HTTPException(status_code=400, detail="Modalidad no válida")
+    
     # Generar archivo con nombre optimizado
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    nombre_original = f"F165_{modalidad}_{request.ficha}_{timestamp}.xlsx"
-    nombre_interno = f"F165_{usuario.id}_{timestamp}_{request.ficha}.xlsx"
+    aprendiz_documento = None
+    if modalidad == "individual" and aprendices:
+        aprendiz_documento = aprendices[0].documento
+        nombre_original = f"F165_{modalidad}_{request.ficha}_{aprendiz_documento}_{timestamp}.xlsx"
+        nombre_interno = f"F165_{usuario.id}_{request.ficha}_{aprendiz_documento}_{timestamp}.xlsx"
+    else:
+        nombre_original = f"F165_{modalidad}_{request.ficha}_{timestamp}.xlsx"
+        nombre_interno = f"F165_{usuario.id}_{request.ficha}_{timestamp}.xlsx"
+    
     ruta_completa = os.path.join(UPLOAD_DIR, nombre_interno)
 
     wb.save(ruta_completa)
@@ -217,7 +283,6 @@ async def exportar_f165(request: ExportarF165Request, db: Session = Depends(get_
             file_hash = hashlib.sha256(f.read()).hexdigest()
         tamaño_archivo = os.path.getsize(ruta_completa)
 
-
         # Guardar en la base de datos
         archivo_excel = ArchivoExcel(
             nombre_original=nombre_original,
@@ -226,6 +291,7 @@ async def exportar_f165(request: ExportarF165Request, db: Session = Depends(get_
             ficha=request.ficha,
             modalidad=modalidad,
             cantidad_aprendices=len(aprendices),
+            aprendiz_documento=aprendiz_documento,  # ✅ Guardamos documento en modalidad individual
             hash_archivo=file_hash,
             tamaño_bytes=tamaño_archivo,
             usuario_id=usuario.id
@@ -233,11 +299,9 @@ async def exportar_f165(request: ExportarF165Request, db: Session = Depends(get_
 
         db.add(archivo_excel)
         db.commit()
+        db.refresh(archivo_excel)
     except Exception as e:
         raise HTTPException(status_code=404,detail=f"Error al guardar en la base de datos: {e}")
-
-
-
 
     #Retornar archivo, optimizado
     try:
@@ -249,7 +313,6 @@ async def exportar_f165(request: ExportarF165Request, db: Session = Depends(get_
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error enviando archivo: {str(e)}")
-
 
 @router_format.get("/archivos/usuario/{usuario_id}")
 def obtener_archivos_por_usuario(usuario_id: int, db: Session = Depends(get_db)):
@@ -309,7 +372,6 @@ def obtener_historial(db: Session = Depends(get_db)):
     .order_by(ArchivoExcel.fecha_creacion.desc())\
     .limit(100)\
     .all()
-
 
     return [
         {
