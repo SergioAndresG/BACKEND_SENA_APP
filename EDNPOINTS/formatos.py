@@ -69,7 +69,7 @@ async def exportar_f165(request: ExportarF165Request, db: Session = Depends(get_
     async def procesar_imagen(firma_data:str)-> str:
         try:
             #Eliminar encabezado si existe
-            if "," in firma_data:
+            if "," in firma_data: 
                 firma_data = firma_data.split(",")[1]
             # Decadificar base64
             firma_bytes = base64.b64decode(firma_data)

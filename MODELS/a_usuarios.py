@@ -9,7 +9,7 @@ class Usuarios(base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     nombre = Column(String(255), nullable=False)
     apellidos = Column(String(255), nullable=False)
-    correo = Column(String(255), nullable=False)
+    correo = Column(String(255), nullable=False, unique=True) # Evita correos duplicados
     rol = Column(Enum(Rol), nullable=False)
     contraseña = Column(String(255), nullable=True)
 
