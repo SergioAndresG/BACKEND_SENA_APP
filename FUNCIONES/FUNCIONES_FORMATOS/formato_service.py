@@ -135,38 +135,5 @@ class FormatoService:
 
         except Exception as e:
             raise Exception(f"Error al obtener ficha {e}")
-        
-    async def _procesar_firmas_en_paralelo(self, firma_data: str, aprendices: list) -> str:
-            try:
-                #Eliminar encabezado si existe
-                if "," in firma_data: 
-                    firma_data = firma_data.split(",")[1]
-                # Decadificar base64
-                firma_bytes = base64.b64decode(firma_data)
 
-                #Crear un archivo temporal
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
-                    tmp_file.write(firma_bytes)
-                    return tmp_file.name
-            except Exception as e:
-                print(f"Errrp procesando imagen: {e}")
-                return None
-            
-                # Procesar las firmas en paralelo
-                # Procesar las firmas en paralelo
-            executor = ThreadPoolExecutor(max_workers=4)
-            
-            tareas_imagenes = []
-
-            for ap in aprendices:
-                if ap.firma:
-                    tarea = asyncio.get_event_loop().run_in_executor(
-                        executor,
-                        lambda firma=ap.firma: asyncio.run(procesar_imagen(firma))
-                    )
-                    tareas_imagenes.append(tarea)
-                else:
-                    tareas_imagenes.append(asyncio.create_task(asyncio.sleep(0, result=None)))  # Placeholder para aprendices sin firma
-
-            imagenes_procesadas = await asyncio.gather(*tareas_imagenes)
 

@@ -165,13 +165,13 @@ async def exportar_f165(request: ExportarF165Request, db: Session = Depends(get_
                 hoja[f"J{fila}"] = "x"
 
             # Ajustar tamaño de columna y fila
-            hoja.row_dimensions[fila].height = 40     # alto de la fila
+            hoja.row_dimensions[fila].height = 50     # alto de la fila
 
             if imagen_path:
                 try:
                     img = OpenpyxlImage(imagen_path)
-                    img.width = 80
-                    img.height = 30
+                    img.width = 120
+                    img.height = 50
 
                     # Insertar la imagen en la celda AG{fila}
                     celda = f"AG{fila}"
