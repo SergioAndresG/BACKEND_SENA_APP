@@ -17,6 +17,7 @@ class Aprendiz(base):
     tipo_documento = Column(String(10), nullable=True)  
     estado = Column(String(50), nullable=True)
 
+
     # Clave foránea para ficha
     ficha_numero = Column(String(20), ForeignKey("Fichas.numero_ficha"))
 
