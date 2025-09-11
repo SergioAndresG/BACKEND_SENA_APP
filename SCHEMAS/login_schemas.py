@@ -34,6 +34,8 @@ class UserResponse(BaseModel):
     id: int
     rol: str
     nombre: str
+    apellidos: str
+    correo: str
 
 class Token(BaseModel):
     access_token: str

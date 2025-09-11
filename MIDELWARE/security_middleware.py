@@ -173,7 +173,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                 return
 
             # Mantener la validación para otros tipos de contenido
-            if not content_type.startswith(("application/json", "application/x-www-form-urlencoded")):
+            if not content_type.startswith(("application/json", "application/x-www-form-urlencoded", "params")):
                 security_logger.warning(f"Invalid content type: {content_type}")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
