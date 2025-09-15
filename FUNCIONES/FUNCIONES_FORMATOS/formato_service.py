@@ -18,16 +18,15 @@ from openpyxl.drawing.image import Image as OpenpyxlImage
 from copy import deepcopy
 from io import BytesIO
 
-
 class FormatoService:
     def __init__(self,base_path = "archivos_exportados"):
         self.base_path = Path(base_path)
         self.base_path.mkdir(parents=True, exist_ok=True)
         try:
             # Cargas tu plantilla GRUPAL
-            self.plantilla_grupal_wb = load_workbook("GRUPAL-F165.xlsx")
+            self.plantilla_grupal_wb = Path("GRUPAL-F165.xlsx")
             # Cargas tu plantilla INDIVIDUAL
-            self.plantilla_individual_wb = load_workbook("INDIVIDUAL-F165.xlsx")
+            self.plantilla_individual_wb = Path("INDIVIDUAL-F165.xlsx")
         except FileNotFoundError as e:
             # Si el archivo no existe, la aplicación no puede funcionar.
             # Es mejor lanzar un error claro aquí.
@@ -37,7 +36,7 @@ class FormatoService:
         """Calcula el hash SHA256 de un archivo."""
         sha256 = hashlib.sha256() # Crea un objeto hash SHA256
         # Abre el archivo en modo binario y lee en bloques para evitar problemas de memoria
-        with ruta_archivo.open(ruta_archivo, "rb") as f:
+        with ruta_archivo.open("rb") as f:
             # Lee el archivo en bloques de 8192 bytes
             # Esto es eficiente para archivos grandes
             while chunk := f.read(8192):
@@ -46,18 +45,29 @@ class FormatoService:
         # Devuelve el hash en formato hexadecimal
         return sha256.hexdigest()
     
+    
     def generar_nombre_interno(self, extension:str="xlsx") -> str:
         """Genera un nombre interno único para el archivo."""
         timpestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         uuid_corto = str(uuid.uuid4())[:8]  # Genera un UUID y toma los primeros 8 caracteres
         return f"{uuid_corto}_{timpestamp}.{extension}"
+    
+
 
     def obtener_ruta_organizada(self, nombre_interno:str) -> Path:
         """Oraganiza los archivos por año/mes para mejor gestion"""
         ahora = datetime.now()
         ruta = self.base_path / str(ahora.year) / str(ahora.month) / "exportados"
         ruta.parent.mkdir(parents=True, exist_ok=True)
-        return ruta / nombre_interno
+        try:
+            ruta.mkdir(parents=True, exist_ok=True)
+            print(f"Carpetas verificadas/creadas: {ruta}")
+        except Exception as e:
+            print(f"Error creando carpetas en obtener_ruta_organizada: {e}")
+            raise
+        return ruta / f"{nombre_interno}.xlsx"
+    
+
 
     def guardar_archivo_seguro(self, contenido: bytes, nombre_original:str, 
                             ficha: str, modalidad: str, cantidad_aprendices:int,
@@ -75,8 +85,7 @@ class FormatoService:
                 f.write(contenido)
 
             #Paso 3: calcular el hash y tamaño
-
-            hash_archivo = self.calcular_hash(str(ruta_completa))
+            hash_archivo = self.calcular_hash(ruta_completa)  # ← SIN str()
             tamaño_bytes = ruta_completa.stat().st_size
 
             #Paso 4: Crear registro en la base de datos
@@ -89,13 +98,14 @@ class FormatoService:
                 cantidad_aprendices=cantidad_aprendices,
                 hash_archivo=hash_archivo,
                 tamaño_bytes=tamaño_bytes,
-                usuario_id=usuario_id if usuario_id else 0  # Asignar 0 si no se proporciona
+                usuario_id=usuario_id if usuario_id else 0
             )
             return archivo_db
         except Exception as e:
             if ruta_completa.exists():
                 ruta_completa.unlink()
             raise Exception(f"Error al guardar el archivo: {str(e)}") from e
+        
 
     def verificar_integridad_archivo(self, archivo_db: ArchivoExcel) -> bool:
         """"Verifica que el archivo no este corrupto"""
@@ -149,6 +159,7 @@ class FormatoService:
         except Exception as e:
             raise Exception(f"Error al obtener ficha {e}")
     
+    @staticmethod
     def _procesar_imagen_individual(firma_data:str)-> str:
         try:
             #Eliminar encabezado si existe
@@ -176,7 +187,7 @@ class FormatoService:
             if ap.firma:
                 tarea = loop.run_in_executor(
                     executor,
-                    self._procesar_imagen_individual,
+                    FormatoService._procesar_imagen_individual,
                     ap.firma
                 )
                 tareas.append(tarea)
@@ -197,7 +208,7 @@ class FormatoService:
         fecha_actual = datetime.now().strftime("%d-%m-%Y")
 
 
-        hoja = wb["GRUPAL-F165"]
+        hoja = wb["Selección formato - Grupal"]
         hoja["E8"] = "x"
         
         hoja["E12"] = "25 / CUNDINAMARCA"
@@ -215,6 +226,8 @@ class FormatoService:
         for celda, valor in datos_fechas.items():
             hoja[celda] = valor
             hoja[celda].font = font_style
+
+
         hoja["T11"] = request.ficha  # Número de ficha
         
         hoja["H11"] = f"Técnico {ficha.programa}"
@@ -231,14 +244,23 @@ class FormatoService:
         hoja["R12"] = informacion_adicional.modalidad_formacion
         hoja["H11"] = informacion_adicional.nivel_formacion
         hoja["E14"] = informacion_adicional.fecha_inicio_etapa_productiva
+        
 
         fila_inicial = 18 # Los datos empiezan en la fila 18
         espacios_disponibles = 20 # La plantilla tiene 20 espacios
-        aprendices_extra = len(aprendices) - espacios_disponibles
+
+        aprendices_extra = len(aprendices) - espacios_disponibles if len(aprendices) > espacios_disponibles else 0
 
         # Inserta filas si hay más aprendices que espacios
         if aprendices_extra > 0:
-            hoja.insert_rows(idx=fila_inicial + espacios_disponibles, amount=aprendices_extra)
+            print(f"{aprendices_extra} aprendices extra")
+            try:
+                hoja.insert_rows(idx=fila_inicial + espacios_disponibles, amount=aprendices_extra)
+                print("Filas insertadas")
+            except Exception as e:
+                print(f"Error al insertar filas: {e}")
+     
+                
 
         # Llenar datos de forma optimizada
         for i, (ap, imagen_path) in enumerate(zip(aprendices, imagenes_procesadas)):
@@ -266,24 +288,24 @@ class FormatoService:
             else:
                 hoja[f"J{fila}"] = "x"
 
-            # Ajustar tamaño de columna y fila
-            hoja.row_dimensions[fila].height = 50     # alto de la fila
+            hoja.row_dimensions[fila].height = 50
+            
 
             if imagen_path:
                 try:
                     img = OpenpyxlImage(imagen_path)
                     img.width = 120
                     img.height = 50
-
-                    # Insertar la imagen en la celda AG{fila}
                     celda = f"AG{fila}"
                     hoja.add_image(img, celda)
-
                 except Exception as e:
                     print(f"Error insertando imagen en fila {fila}: {e}")
+                    print(f"Tipo de error {type(e)}")
 
 
     def _llenar_F165_individual(self,wb,ficha,aprendices,imagenes_procesadas,request,usuario_gene,informacion_adicional):
+        if not aprendices:
+            raise ValueError("La lista de aprendices no puede estar vacía para el formato individual.")
         fecha_inicio = ficha.fecha_inicio.strftime("%d-%m-%Y") if ficha.fecha_inicio else "N/A"
         fecha_fin = ficha.fecha_fin.strftime("%d-%m-%Y") if ficha.fecha_fin else "N/A"
         fecha_actual = datetime.now().strftime("%d-%m-%Y")
@@ -340,13 +362,13 @@ class FormatoService:
             except Exception as e:
                 print(f"Error insertando imagen en hoja individual: {e}")
 
-
     def generar_f165_grupal(self, ficha, aprendices, imagenes_procesadas, request, usuario_gene, informacion_adicional):
         """
         Función pública que prepara y genera el formato F165 grupal.
         """
-        # 1. Crea una copia profunda para no modificar la plantilla original en memoria
-        wb_copia = deepcopy(self.plantilla_grupal_wb)
+
+        wb_copia = load_workbook(self.plantilla_grupal_wb)
+
 
         # 2. Llama a tu función de llenado, pero pasándole la COPIA
         self._llenar_F165_grupal(
@@ -384,21 +406,48 @@ class FormatoService:
 
         wb = None
         if modalidad == "grupal":
-            wb = self.generar_f165_grupal(ficha,imagenes_procesadas,request,usuario_gene,informacion_adicional)
+            print("Generando formato grupal...")
+            wb = self.generar_f165_grupal(ficha, aprendices, imagenes_procesadas, request, usuario_gene, informacion_adicional)
+            print("Formato grupal generado correctamente")
             nombre_original = f"F165_{request.ficha}_{request.modalidad}"
+            print(f"Nombre archivo: {nombre_original}")
+            nombre_original = f"F165_{request.ficha}_{request.modalidad}"
+
+            
         elif modalidad == "individual":
-            wb = self.generar_f165_individual(ficha,imagenes_procesadas,request,usuario_gene,informacion_adicional)
+            wb = self.generar_f165_individual(ficha, aprendices, imagenes_procesadas, request, usuario_gene, informacion_adicional)
             nombre_original = f"F165_{request.ficha}_{request.modalidad}"
         else:
             raise Exception("Modalidad no válida")
         
-
+    
+        print("Creando BytesIO stream...")
         stream = BytesIO()
-        wb.save(stream)
+        print("Guardando workbook en stream...")
+
+        print(f"Worksheets en wb: {[ws.title for ws in wb.worksheets]}")
+        print(f"Hoja activa: {wb.active.title}")
+        
+        # Verificar que no hay celdas problemáticas
+        hoja = wb["Selección formato - Grupal"]
+        print(f"Max row: {hoja.max_row}, Max col: {hoja.max_column}")
+
+        try:
+            wb.save(stream)  
+            print("Workbook guardado en stream")
+        except Exception as e:
+            print(f"Error al guardar workbook: {e}")
+            print(f"Tipo de error: {type(e)}")
+            import traceback
+            traceback.print_exc()  # Esto te dará más detalles del error
+            raise
+
         stream.seek(0)
         contenido_bytes = stream.read()
+        print(f"Contenido leído: {len(contenido_bytes)} bytes")
 
 
+        print("Llamando a guardar_archivo_seguro...")
         archivo_db = self.guardar_archivo_seguro(
             contenido=contenido_bytes,
             nombre_original=nombre_original,
@@ -408,13 +457,18 @@ class FormatoService:
             usuario_id=usuario_gene.id
         )
 
+        print("Archivo guardado en memoria correctamente")
+
+        print("Guardando en base de datos...")
         try:
             db.add(archivo_db)
             db.commit()
             db.refresh(archivo_db)
+            print("Guardado en BD correctamente")
         except Exception as e:
             db.rollback()
             raise Exception(f"Error al guardar en la base de datos: {str(e)}") from e
 
         ruta_completa = self.base_path / archivo_db.ruta_archivo
+        print(f"Ruta completa: {ruta_completa}")
         return archivo_db, ruta_completa
