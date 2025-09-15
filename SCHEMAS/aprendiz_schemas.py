@@ -3,6 +3,7 @@ from typing import List
 from typing import Optional
 from .usuario_schemas import UsuarioGenerador
 from .ficha_schamas import informacionAdicional
+from datetime import datetime
 
 class AprendizParaExportar(BaseModel):
     tipo_documento: str
@@ -31,6 +32,8 @@ class AprendizActualizarRequest(BaseModel):
     celular: Optional[str] = None
     discapacidad: Optional[str] = None
     tipo_discapacidad: Optional[str] = None
+    firma: Optional[str] = None
+    editado: Optional[bool] = None
 
 class AprendixActualizarResponse(BaseModel):
     """Modelo de respuesta para la actualización de un aprendiz"""
