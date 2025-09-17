@@ -65,7 +65,7 @@ class FormatoService:
         except Exception as e:
             print(f"Error creando carpetas en obtener_ruta_organizada: {e}")
             raise
-        return ruta / f"{nombre_interno}.xlsx"
+        return ruta / f"{nombre_interno}"
     
 
 
@@ -406,11 +406,8 @@ class FormatoService:
 
         wb = None
         if modalidad == "grupal":
-            print("Generando formato grupal...")
             wb = self.generar_f165_grupal(ficha, aprendices, imagenes_procesadas, request, usuario_gene, informacion_adicional)
-            print("Formato grupal generado correctamente")
             nombre_original = f"F165_{request.ficha}_{request.modalidad}"
-            print(f"Nombre archivo: {nombre_original}")
             nombre_original = f"F165_{request.ficha}_{request.modalidad}"
 
             
@@ -420,10 +417,7 @@ class FormatoService:
         else:
             raise Exception("Modalidad no válida")
         
-    
-        print("Creando BytesIO stream...")
         stream = BytesIO()
-        print("Guardando workbook en stream...")
 
         print(f"Worksheets en wb: {[ws.title for ws in wb.worksheets]}")
         print(f"Hoja activa: {wb.active.title}")
@@ -434,7 +428,6 @@ class FormatoService:
 
         try:
             wb.save(stream)  
-            print("Workbook guardado en stream")
         except Exception as e:
             print(f"Error al guardar workbook: {e}")
             print(f"Tipo de error: {type(e)}")
