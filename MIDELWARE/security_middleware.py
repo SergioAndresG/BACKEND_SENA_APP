@@ -82,7 +82,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         if request.method in ["POST", "PUT", "PATCH"]:
             content_length = request.headers.get("content-length")
             # Aumentamos el límite a 10MB para permitir archivos Excel
-            if content_length and int(content_length) > 10 * 1024 * 1024:  # 10MB
+            if content_length and int(content_length) > 20 * 1024 * 1024:  # 10MB
                 security_logger.warning(f"Large request body from {client_ip}: {content_length}")
                 raise HTTPException(
                     status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
