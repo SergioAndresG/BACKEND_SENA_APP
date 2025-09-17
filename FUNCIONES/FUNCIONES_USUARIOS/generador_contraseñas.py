@@ -8,8 +8,11 @@ def generar_contraseña():
     #Longitud de la contraseña
     longitud_comtraseña = 9
 
+    # Caracteres especiales
+    cacaracteres_especiales = ".-_"
+
     #Caracteres que se van a usuar para generar la contraseña
-    cacaracteres = string.ascii_letters + string.digits + string.punctuation
+    cacaracteres = string.ascii_letters + string.digits + cacaracteres_especiales
 
     #lista para guardar las contraseñas generadas
     contraseñas_generadas = []
