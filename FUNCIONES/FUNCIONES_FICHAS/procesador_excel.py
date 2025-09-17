@@ -35,9 +35,28 @@ class ProcesadorArchivos:
         """Procesa un archivo Excel individual"""
         try:
             # Crear archivo temporal
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as temp_file:
+            _, extension = os.path.splitext(nombre_archivo)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=extension) as temp_file:
                 temp_file.write(archivo_bytes)
                 temp_path = temp_file.name
+
+            if extension.lower() == '.xls':
+                print("xls")
+                try:
+                    df_pandas = pd.read_excel(temp_path, header=None, dtype=str)
+                    df = pl.from_pandas(df_pandas)
+                except Exception as e:
+                    print("Error al leer")
+                    raise ValueError("Archivo .xls corrupto")
+            else:
+                print("xlsx")
+                try:
+                    df = pl.read_excel(temp_path)
+                except Exception as e:
+                    print("Error con polars")
+                    raise ValueError("Archivo .xlsx corrupto")
+
+
 
             # Nota: read_excel en versiones recientes de Polars no acepta read_csv_options
             df = pl.read_excel(temp_path)
