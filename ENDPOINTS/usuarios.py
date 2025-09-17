@@ -6,7 +6,9 @@ from FUNCIONES.FUNCIONES_USUARIOS.generador_contraseñas import generar_contrase
 from typing import List
 from connection import get_db
 import bcrypt
+from passlib.context import CryptContext
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 router_usuarios = APIRouter()
 
@@ -77,9 +79,14 @@ async def crear_usuario(usuario: UsuarioCreate, db: Session = Depends(get_db)):
             rol=Rol(usuario.rol),
             contraseña=contraseña
         )
+        if nuevo_usuario:
+            if not pwd_context.identify(nuevo_usuario.contraseña):
+                nuevo_usuario.contraseña = pwd_context.hash(nuevo_usuario.contraseña)
+
         db.add(nuevo_usuario)
         db.commit()
         db.refresh(nuevo_usuario)
+
         return UsuarioResponse(
             id=nuevo_usuario.id,
             nombre=nuevo_usuario.nombre,
@@ -88,6 +95,7 @@ async def crear_usuario(usuario: UsuarioCreate, db: Session = Depends(get_db)):
             rol=nuevo_usuario.rol,
             contraseña=contraseña
         )
+    
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
