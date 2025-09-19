@@ -94,6 +94,8 @@ async def obtener_aprendiz(documento: str, db: Session = Depends(get_db)):
             "direccion": aprendiz.direccion,
             "correo": aprendiz.correo,
             "celular": aprendiz.celular,
+            "departamento": aprendiz.departamento,
+            "municipio": aprendiz.municipio,
             "estado": aprendiz.estado,
             "firma": aprendiz.firma or "",
             "editado": aprendiz.editado
