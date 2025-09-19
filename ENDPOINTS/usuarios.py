@@ -139,3 +139,50 @@ async def actualizar_usuario(usuario_id: int, usuario: UsuarioCreate, db: Sessio
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+@router_usuarios.patch("/usuarios/{usuario_id}", response_model=UsuarioResponse)
+async def cambiar_contraseña(usuario_id: int, db: Session = Depends(get_db)):
+    """
+    Obtiene los datos de un usuario por su ID.
+
+    Args:
+        usuario_id (int): ID del usuario a obtener.
+        db (Session): Sesión de base de datos.
+
+    Returns:
+        UsuarioGenerador: Datos del usuario.
+    """
+    try:
+        usuario = db.query(Usuarios).filter(Usuarios.id == usuario_id).first()
+        
+        if not usuario:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        contraseña = generar_contraseña()
+
+
+        try:
+            usuario.contraseña = contraseña
+            print(contraseña)
+            if not pwd_context.identify(usuario.contraseña):
+                usuario.contraseña = pwd_context.hash(usuario.contraseña)
+            
+
+            db.commit()
+            db.refresh(usuario)
+        except Exception as e:
+            db.rollback()
+
+        return UsuarioResponse(
+            id=usuario.id,
+            nombre=usuario.nombre,
+            apellidos=usuario.apellidos,
+            correo=usuario.correo,
+            rol=usuario.rol,
+            contraseña=contraseña
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
