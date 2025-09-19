@@ -17,6 +17,10 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.drawing.image import Image as OpenpyxlImage
 from copy import deepcopy
 from io import BytesIO
+from MODELS import ArchivoExcel, Ficha
+from fastapi import Depends
+
+
 
 class FormatoService:
     def __init__(self,base_path = "archivos_exportados"):
@@ -203,6 +207,7 @@ class FormatoService:
     
 
     def _llenar_F165_grupal(self,wb,ficha,aprendices,imagenes_procesadas,request,usuario_gene,informacion_adicional):
+
         fecha_inicio = ficha.fecha_inicio.strftime("%d-%m-%Y") if ficha.fecha_inicio else "N/A"
         fecha_fin = ficha.fecha_fin.strftime("%d-%m-%Y") if ficha.fecha_fin else "N/A"
         fecha_actual = datetime.now().strftime("%d-%m-%Y")
@@ -213,7 +218,6 @@ class FormatoService:
                 fecha_productiva = datetime.strptime(fecha_productiva, "%Y-%m-%d").date()
             except ValueError:
                 fecha_productiva = None
-
 
         hoja = wb["Selección formato - Grupal"]
         hoja["E8"] = "x"
@@ -241,7 +245,7 @@ class FormatoService:
 
         hoja["T11"] = request.ficha  # Número de ficha
         
-        hoja["H11"] = f"Técnico {ficha.programa}"
+        hoja["H11"] = f"{ficha.programa}"
 
         nombre_completo_instructor = f"{usuario_gene.nombre} {usuario_gene.apellidos}"
 
@@ -253,7 +257,11 @@ class FormatoService:
         hoja["J13"] = informacion_adicional.trimestre
         hoja["J14"] = informacion_adicional.jornada
         hoja["R12"] = informacion_adicional.modalidad_formacion
+
         hoja["H11"] = f"{informacion_adicional.nivel_formacion} {ficha.programa}"
+
+        hoja["E14"] = informacion_adicional.fecha_inicio_etapa_productiva
+        
 
         fila_inicial = 18 # Los datos empiezan en la fila 18
         espacios_disponibles = 20 # La plantilla tiene 20 espacios
@@ -447,6 +455,8 @@ class FormatoService:
 
         print(f"Worksheets en wb: {[ws.title for ws in wb.worksheets]}")
         print(f"Hoja activa: {wb.active.title}")
+
+        ficha = db.query(Ficha).filter(Ficha.numero_ficha == request.ficha).first()
         
         # Verificar que no hay celdas problemáticas
         print(f"Worksheets en wb: {[ws.title for ws in wb.worksheets]}")
@@ -461,6 +471,8 @@ class FormatoService:
         else:
             raise Exception("Modalidad no válida")
 
+        hoja = wb["Selección formato - Grupal"]
+        hoja["H11"] = f"{informacion_adicional.nivel_formacion} - {ficha.programa}"
         print(f"Max row: {hoja.max_row}, Max col: {hoja.max_column}")
 
         try:
