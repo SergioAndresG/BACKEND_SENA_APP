@@ -9,6 +9,8 @@ from connection import SessionLocal
 from typing import List
 import uuid
 import os
+from SCHEMAS.ficha_schamas import InformacionAdicional
+from datetime import datetime
 
 router_tokens = APIRouter()
 
@@ -208,8 +210,12 @@ async def obtener_aprendiz(
             "celular": aprendiz.celular,
             "correo": aprendiz.correo,
             "direccion": aprendiz.direccion,
+            "departamento": aprendiz.departamento,
+            "municipio": aprendiz.municipio,
             "tipo_documento": aprendiz.tipo_documento,
-            "estado": aprendiz.estado
+            "estado": aprendiz.estado,
+            "firma": aprendiz.firma or "",
+            "editado": aprendiz.editado
         }
 
         return {
@@ -233,3 +239,51 @@ def descargar_archivo(ruta: str):
         filename=nombre_archivo,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
+#Guardar la información adicional de la ficha
+@router_tokens.post("/ficha/{numero_ficha}/informacion-adicional")
+def guardar_informacion_adicional(
+    numero_ficha: str,
+    info: InformacionAdicional,
+    db: Session = Depends(get_db)
+):
+    ficha = db.query(Ficha).filter(Ficha.numero_ficha == numero_ficha).first()
+    if not ficha:
+        raise HTTPException(status_code=404, detail="Ficha no encontrada")
+
+    # Ya no usamos .value porque info.* ya es un string
+    ficha.nivel_formacion = info.nivel_formacion
+    ficha.modalidad_formacion = info.modalidad_formacion
+    ficha.trimestre = info.trimestre
+    ficha.jornada = info.jornada
+
+    # Convertir string a date si viene fecha
+    if info.fecha_inicio_etapa_productiva:
+        ficha.fecha_inicio_prod = datetime.strptime(
+            info.fecha_inicio_etapa_productiva, "%Y-%m-%d"
+        ).date()
+
+    db.commit()
+    db.refresh(ficha)
+    return {"message": "Información adicional guardada", "ficha": ficha.numero_ficha}
+
+#Obtener la información adicional de la ficha
+@router_tokens.get("/ficha/{numero_ficha}/informacion-adicional")
+def obtener_informacion_adicional(
+    numero_ficha: str,
+    db: Session = Depends(get_db)
+):
+    ficha = db.query(Ficha).filter(Ficha.numero_ficha == numero_ficha).first()
+    if not ficha:
+        raise HTTPException(status_code=404, detail="Ficha no encontrada")
+
+    return {
+        "nivel_formacion": ficha.nivel_formacion,
+        "modalidad_formacion": ficha.modalidad_formacion,
+        "trimestre": ficha.trimestre,
+        "fecha_inicio_etapa_productiva": (
+            ficha.fecha_inicio_prod.strftime("%Y-%m-%d")
+            if ficha.fecha_inicio_prod else None
+        ),
+        "jornada": ficha.jornada
+    }
