@@ -4,6 +4,7 @@ from connection import base
 
 class Ficha(base):
     __tablename__ = "Fichas"
+
     numero_ficha = Column(String(10), primary_key=True)
     programa = Column(String(200), nullable=True)
     estado = Column(String(100), nullable=True)
@@ -11,8 +12,11 @@ class Ficha(base):
     fecha_fin = Column(Date, nullable=True)
     fecha_reporte = Column(Date, nullable=True)
     fecha_inicio_prod = Column(Date, nullable=True)
-    trimeste = Column(String(50), nullable=True)
-    jornada = Column(String(50), nullable=True)
-    modalidad = Column(String(50), nullable=True)
+    trimestre = Column(String(50), nullable=True)
+
+    # Aquí guardas los enums como texto
+    nivel_formacion = Column(String(20), nullable=True)
+    modalidad_formacion = Column(String(20), nullable=True)
+    jornada = Column(String(20), nullable=True)
 
     aprendices = relationship("Aprendiz", back_populates="ficha")
