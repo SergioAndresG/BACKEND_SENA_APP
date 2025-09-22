@@ -71,7 +71,7 @@ class FormatoService:
 
     def guardar_archivo_seguro(self, contenido: bytes, nombre_original:str, 
                             ficha: str, modalidad: str, cantidad_aprendices:int,
-                            usuario_id: Optional[int] = None) -> ArchivoExcel:
+                            usuario_id: Optional[int] = None, aprendiz_documento=None) -> ArchivoExcel:
         """ Guarda un archivo de Excel de manera segura con validaciones """
 
         try:
@@ -98,7 +98,8 @@ class FormatoService:
                 cantidad_aprendices=cantidad_aprendices,
                 hash_archivo=hash_archivo,
                 tamaño_bytes=tamaño_bytes,
-                usuario_id=usuario_id if usuario_id else 0
+                usuario_id=usuario_id if usuario_id else 0,
+                aprendiz_documento=aprendiz_documento,
             )
             return archivo_db
         except Exception as e:
@@ -240,8 +241,6 @@ class FormatoService:
             hoja[celda].font = font_style
 
         hoja["T11"] = request.ficha  # Número de ficha
-        
-        hoja["H11"] = f"Técnico {ficha.programa}"
 
         nombre_completo_instructor = f"{usuario_gene.nombre} {usuario_gene.apellidos}"
 
@@ -432,6 +431,10 @@ class FormatoService:
         ficha = self._validar_y_obtener_ficha(request.ficha,db)
 
         wb = None
+        nombre_original = None
+        aprendiz_documento = None 
+        ap = aprendices[0]
+        
         if modalidad == "grupal":
             wb = self.generar_f165_grupal(ficha, aprendices, imagenes_procesadas, request, usuario_gene, informacion_adicional)
             nombre_original = f"F165_{request.ficha}_{request.modalidad}"
@@ -439,14 +442,17 @@ class FormatoService:
             
         elif modalidad == "individual":
             wb = self.generar_f165_individual(ficha, aprendices, imagenes_procesadas, request, usuario_gene, informacion_adicional)
-            nombre_original = f"F165_{request.ficha}_{request.modalidad}"
+
+            if aprendices and len(aprendices) > 0:
+                aprendiz_documento = ap.documento  # 👈 sacar el documento
+                print("documento aprendiz", ap.documento)
+                nombre_original = f"F165_{request.ficha}_{modalidad}_{aprendiz_documento}"
+                print("este es el nombre del archivo", nombre_original)
+
         else:
             raise Exception("Modalidad no válida")
         
         stream = BytesIO()
-
-        print(f"Worksheets en wb: {[ws.title for ws in wb.worksheets]}")
-        print(f"Hoja activa: {wb.active.title}")
         
         # Verificar que no hay celdas problemáticas
         print(f"Worksheets en wb: {[ws.title for ws in wb.worksheets]}")
@@ -484,7 +490,8 @@ class FormatoService:
             ficha=request.ficha,
             modalidad=modalidad,
             cantidad_aprendices=len(aprendices),
-            usuario_id=usuario_gene.id
+            usuario_id=usuario_gene.id,
+            aprendiz_documento=aprendiz_documento
         )
 
         print("Archivo guardado en memoria correctamente")

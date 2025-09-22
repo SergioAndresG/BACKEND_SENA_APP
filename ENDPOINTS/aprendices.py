@@ -107,4 +107,3 @@ async def obtener_aprendiz(documento: str, db: Session = Depends(get_db)):
     except Exception as e:
         print("❌ Error en obtener_aprendiz:", traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
-
