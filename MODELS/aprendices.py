@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Enum
 from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -19,9 +19,9 @@ class Aprendiz(base):
     estado = Column(String(50), nullable=True)
     firma = Column(LONGTEXT, nullable=True)
     ultima_actualizacion = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    discapacidad = Column(Enum('SI', 'NO'), nullable=True)
+    tipo_discapacidad = Column(Enum('AUDITIVA', 'VISUAL', 'FISICA', 'INTELECTUAL', 'SORDOCEGUERA', 'PSICOSOCIAL', 'MULTIPLE'), nullable=True)
     editado = Column(Boolean, default=False)
-
-
 
     # Clave foránea para ficha
     ficha_numero = Column(String(20), ForeignKey("Fichas.numero_ficha"))
