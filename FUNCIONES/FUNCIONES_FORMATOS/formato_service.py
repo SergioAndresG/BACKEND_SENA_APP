@@ -75,7 +75,7 @@ class FormatoService:
 
     def guardar_archivo_seguro(self, contenido: bytes, nombre_original:str, 
                             ficha: str, modalidad: str, cantidad_aprendices:int,
-                            usuario_id: Optional[int] = None) -> ArchivoExcel:
+                            usuario_id: Optional[int] = None, aprendiz_documento=None) -> ArchivoExcel:
         """ Guarda un archivo de Excel de manera segura con validaciones """
 
         try:
@@ -102,7 +102,8 @@ class FormatoService:
                 cantidad_aprendices=cantidad_aprendices,
                 hash_archivo=hash_archivo,
                 tamaño_bytes=tamaño_bytes,
-                usuario_id=usuario_id if usuario_id else 0
+                usuario_id=usuario_id if usuario_id else 0,
+                aprendiz_documento=aprendiz_documento,
             )
             return archivo_db
         except Exception as e:
@@ -211,6 +212,13 @@ class FormatoService:
         fecha_inicio = ficha.fecha_inicio.strftime("%d-%m-%Y") if ficha.fecha_inicio else "N/A"
         fecha_fin = ficha.fecha_fin.strftime("%d-%m-%Y") if ficha.fecha_fin else "N/A"
         fecha_actual = datetime.now().strftime("%d-%m-%Y")
+        
+        fecha_productiva = informacion_adicional.fecha_inicio_etapa_productiva
+        if isinstance(fecha_productiva, str):
+            try:
+                fecha_productiva = datetime.strptime(fecha_productiva, "%Y-%m-%d").date()
+            except ValueError:
+                fecha_productiva = None
 
         hoja = wb["Selección formato - Grupal"]
         hoja["E8"] = "x"
@@ -222,19 +230,21 @@ class FormatoService:
             "E13": fecha_inicio,
             "H13": fecha_fin,
             "H14": fecha_fin, 
-            "E11": fecha_actual
+            "E11": fecha_actual,
+            "E14": fecha_productiva
         }
 
         # Aplicar todo de una vez
         font_style = Font(size=12, bold=True)
         for celda, valor in datos_fechas.items():
-            hoja[celda] = valor
+            if valor:  # Si hay fecha válida
+                hoja[celda].value = valor
+                hoja[celda].number_format = "DD-MM-YYYY"  # <-- Forzar formato de fecha
+            else:
+                hoja[celda].value = "N/A"
             hoja[celda].font = font_style
 
-
         hoja["T11"] = request.ficha  # Número de ficha
-        
-        hoja["H11"] = f"{ficha.programa}"
 
         nombre_completo_instructor = f"{usuario_gene.nombre} {usuario_gene.apellidos}"
 
@@ -246,6 +256,9 @@ class FormatoService:
         hoja["J13"] = informacion_adicional.trimestre
         hoja["J14"] = informacion_adicional.jornada
         hoja["R12"] = informacion_adicional.modalidad_formacion
+
+        hoja["H11"] = f"{informacion_adicional.nivel_formacion} {ficha.programa}"
+
         hoja["E14"] = informacion_adicional.fecha_inicio_etapa_productiva
         
 
@@ -262,8 +275,6 @@ class FormatoService:
                 print("Filas insertadas")
             except Exception as e:
                 print(f"Error al insertar filas: {e}")
-     
-                
 
         # Llenar datos de forma optimizada
         for i, (ap, imagen_path) in enumerate(zip(aprendices, imagenes_procesadas)):
@@ -312,8 +323,15 @@ class FormatoService:
         fecha_inicio = ficha.fecha_inicio.strftime("%d-%m-%Y") if ficha.fecha_inicio else "N/A"
         fecha_fin = ficha.fecha_fin.strftime("%d-%m-%Y") if ficha.fecha_fin else "N/A"
         fecha_actual = datetime.now().strftime("%d-%m-%Y")
+        
+        fecha_productiva = informacion_adicional.fecha_inicio_etapa_productiva
+        if isinstance(fecha_productiva, str):
+            try:
+                fecha_productiva = datetime.strptime(fecha_productiva, "%Y-%m-%d").date()
+            except ValueError:
+                fecha_productiva = None
 
-        hoja = wb["INDIVIDUAL-F165"]
+        hoja = wb["Selección Modificación Indiv"]
         hoja["C8"] = "x"
 
         # Tomar el primer (y único) aprendiz
@@ -339,18 +357,30 @@ class FormatoService:
         hoja["B17"] = "25 / CUNDINAMARCA"
         hoja["C17"] = "9512 / CENTRO DE BIOTECNOLOGIA AGROPECUARIA"
         hoja["E17"] = request.ficha
-        hoja["F17"] = f"Técnico"
+        hoja["F17"] = informacion_adicional.nivel_formacion
         hoja["G17"] = ficha.programa
         hoja["E19"] = "Selección de alternativa: ( X )"
+        
+        hoja["B19"] = informacion_adicional.jornada
+        hoja["H17"] = informacion_adicional.modalidad_formacion
 
         datos_fechas = {
             "C19": fecha_inicio,
             "D19": fecha_fin,
             "H19": fecha_fin,
-            "B12": fecha_actual
+            "B12": fecha_actual,
+            "G19": fecha_productiva  
         }
+        
+        # Aplicar todo de una vez
+        font_style = Font(size=12, bold=True)
         for celda, valor in datos_fechas.items():
-            hoja[celda] = valor
+            if valor:  # Si hay fecha válida
+                hoja[celda].value = valor
+                hoja[celda].number_format = "DD-MM-YYYY"  # <-- Forzar formato de fecha
+            else:
+                hoja[celda].value = "N/A"
+            hoja[celda].font = font_style
 
         hoja["D22"] = "X"
         hoja["F30"] = f"{ap.nombre} {ap.apellido}"
@@ -390,7 +420,8 @@ class FormatoService:
         Función pública que prepara y genera el formato F165 individual.
         """
         # 1. Crea una copia profunda para no modificar la plantilla original en memoria
-        wb_copia = deepcopy(self.plantilla_individual_wb)
+        wb_copia = load_workbook(self.plantilla_individual_wb)
+        print("Hojas en plantilla individual:", wb_copia.sheetnames)
 
         # 2. Llama a tu función de llenado, pero pasándole la COPIA
         self._llenar_F165_individual(
@@ -408,26 +439,42 @@ class FormatoService:
         ficha = self._validar_y_obtener_ficha(request.ficha,db)
 
         wb = None
+        nombre_original = None
+        aprendiz_documento = None 
+        ap = aprendices[0]
+        
         if modalidad == "grupal":
             wb = self.generar_f165_grupal(ficha, aprendices, imagenes_procesadas, request, usuario_gene, informacion_adicional)
             nombre_original = f"F165_{request.ficha}_{request.modalidad}"
             nombre_original = f"F165_{request.ficha}_{request.modalidad}"
-
             
         elif modalidad == "individual":
             wb = self.generar_f165_individual(ficha, aprendices, imagenes_procesadas, request, usuario_gene, informacion_adicional)
-            nombre_original = f"F165_{request.ficha}_{request.modalidad}"
+
+            if aprendices and len(aprendices) > 0:
+                aprendiz_documento = ap.documento  # 👈 sacar el documento
+                print("documento aprendiz", ap.documento)
+                nombre_original = f"F165_{request.ficha}_{modalidad}_{aprendiz_documento}"
+                print("este es el nombre del archivo", nombre_original)
+
         else:
             raise Exception("Modalidad no válida")
         
         stream = BytesIO()
-
-        print(f"Worksheets en wb: {[ws.title for ws in wb.worksheets]}")
-        print(f"Hoja activa: {wb.active.title}")
-
-        ficha = db.query(Ficha).filter(Ficha.numero_ficha == request.ficha).first()
         
         # Verificar que no hay celdas problemáticas
+        print(f"Worksheets en wb: {[ws.title for ws in wb.worksheets]}")
+        print(f"Hoja activa: {wb.active.title}")
+        
+        print("Hojas disponibles:", wb.sheetnames)
+
+        if modalidad == "grupal":
+            hoja = wb["Selección formato - Grupal"]
+        elif modalidad == "individual":
+            hoja = wb["Selección Modificación Indiv"]
+        else:
+            raise Exception("Modalidad no válida")
+
         hoja = wb["Selección formato - Grupal"]
         hoja["H11"] = f"{informacion_adicional.nivel_formacion} - {ficha.programa}"
         print(f"Max row: {hoja.max_row}, Max col: {hoja.max_column}")
@@ -453,7 +500,8 @@ class FormatoService:
             ficha=request.ficha,
             modalidad=modalidad,
             cantidad_aprendices=len(aprendices),
-            usuario_id=usuario_gene.id
+            usuario_id=usuario_gene.id,
+            aprendiz_documento=aprendiz_documento
         )
 
         print("Archivo guardado en memoria correctamente")

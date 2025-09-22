@@ -2,8 +2,8 @@ from pydantic import BaseModel
 from typing import List
 from typing import Optional
 from .usuario_schemas import UsuarioGenerador
-from .ficha_schamas import informacionAdicional
 from datetime import datetime
+from .ficha_schamas import InformacionAdicional
 
 class AprendizParaExportar(BaseModel):
     tipo_documento: str
@@ -46,6 +46,6 @@ class ExportarF165Request(BaseModel):
     ficha: str
     aprendices: List[AprendizParaExportar]
     usuario_generator: UsuarioGenerador
-    informacion_adicional: informacionAdicional
+    informacion_adicional: InformacionAdicional
 
     

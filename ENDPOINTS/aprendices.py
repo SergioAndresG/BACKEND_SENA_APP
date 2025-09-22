@@ -96,6 +96,8 @@ async def obtener_aprendiz(documento: str, db: Session = Depends(get_db)):
             "direccion": aprendiz.direccion,
             "correo": aprendiz.correo,
             "celular": aprendiz.celular,
+            "departamento": aprendiz.departamento,
+            "municipio": aprendiz.municipio,
             "estado": aprendiz.estado,
             "discapacidad": aprendiz.discapacidad,
             "tipo_discapacidad": aprendiz.tipo_discapacidad,
@@ -109,4 +111,3 @@ async def obtener_aprendiz(documento: str, db: Session = Depends(get_db)):
     except Exception as e:
         print("❌ Error en obtener_aprendiz:", traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
-
