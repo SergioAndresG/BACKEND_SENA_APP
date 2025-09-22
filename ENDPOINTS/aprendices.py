@@ -51,6 +51,8 @@ async def actualizar_aprendiz(
             "direccion": aprendiz.direccion,
             "correo": aprendiz.correo,
             "celular": aprendiz.celular,
+            "tipo_discapacidad": aprendiz.tipo_discapacidad,
+            "discapacidad": aprendiz.discapacidad,
             "estado": aprendiz.estado,
             "firma": aprendiz.firma or ""
         }
@@ -95,6 +97,8 @@ async def obtener_aprendiz(documento: str, db: Session = Depends(get_db)):
             "correo": aprendiz.correo,
             "celular": aprendiz.celular,
             "estado": aprendiz.estado,
+            "discapacidad": aprendiz.discapacidad,
+            "tipo_discapacidad": aprendiz.tipo_discapacidad,
             "firma": aprendiz.firma or "",
             "editado": aprendiz.editado
         }
