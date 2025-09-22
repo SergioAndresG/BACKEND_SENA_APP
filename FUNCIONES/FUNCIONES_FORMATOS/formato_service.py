@@ -286,7 +286,7 @@ class FormatoService:
                 hoja[celda] = valor
             
             # Manejar discapacidad
-            if ap.discapacidad == 'No':
+            if ap.discapacidad == 'NO':
                 hoja[f"K{fila}"] = "x"
             else:
                 hoja[f"J{fila}"] = "x"
@@ -330,7 +330,7 @@ class FormatoService:
         hoja["C14"] = ap.departamento
         hoja["D14"] = ap.municipio
 
-        if ap.discapacidad == 'No':
+        if ap.discapacidad == 'NO':
             hoja["E14"] = "Si   (  )   No   ( X )"
         else:
             hoja["E14"] = "Si   ( X )   No   (  )"  
