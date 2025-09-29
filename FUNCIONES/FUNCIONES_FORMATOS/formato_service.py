@@ -258,8 +258,6 @@ class FormatoService:
         hoja["R12"] = informacion_adicional.modalidad_formacion
 
         hoja["H11"] = f"{informacion_adicional.nivel_formacion} {ficha.programa}"
-
-        hoja["E14"] = informacion_adicional.fecha_inicio_etapa_productiva
         
 
         fila_inicial = 18 # Los datos empiezan en la fila 18
@@ -475,9 +473,7 @@ class FormatoService:
         else:
             raise Exception("Modalidad no válida")
 
-        hoja = wb["Selección formato - Grupal"]
-        hoja["H11"] = f"{informacion_adicional.nivel_formacion} - {ficha.programa}"
-        print(f"Max row: {hoja.max_row}, Max col: {hoja.max_column}")
+
 
         try:
             wb.save(stream)  
