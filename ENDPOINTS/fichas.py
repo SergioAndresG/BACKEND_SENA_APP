@@ -281,6 +281,8 @@ def obtener_informacion_adicional(
         "nivel_formacion": ficha.nivel_formacion,
         "modalidad_formacion": ficha.modalidad_formacion,
         "trimestre": ficha.trimestre,
+        "fecha_inicio": ficha.fecha_inicio,
+        "fecha_fin": ficha.fecha_fin,
         "fecha_inicio_etapa_productiva": (
             ficha.fecha_inicio_prod.strftime("%Y-%m-%d")
             if ficha.fecha_inicio_prod else None
