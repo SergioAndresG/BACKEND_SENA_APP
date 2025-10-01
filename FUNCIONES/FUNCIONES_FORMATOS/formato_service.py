@@ -20,7 +20,10 @@ from io import BytesIO
 from MODELS import ArchivoExcel, Ficha
 from fastapi import Depends
 
-
+def capitalizar(texto: str) -> str:
+    if not texto:
+        return ""
+    return texto.strip().lower().title()
 
 class FormatoService:
     def __init__(self,base_path = "archivos_exportados"):
@@ -223,8 +226,8 @@ class FormatoService:
         hoja = wb["Selección formato - Grupal"]
         hoja["E8"] = "x"
         
-        hoja["E12"] = "25 / CUNDINAMARCA"
-        hoja["H12"] = "9512 / CENTRO DE BIOTECNOLOGIA AGROPECUARIA"
+        hoja["E12"] = "25 / Cundinamarca"
+        hoja["H12"] = "9512 / Centro De Biotecnología Agropecuaria"
         
         datos_fechas = {
             "E13": fecha_inicio,
@@ -246,22 +249,19 @@ class FormatoService:
 
         hoja["T11"] = request.ficha  # Número de ficha
 
-        nombre_completo_instructor = f"{usuario_gene.nombre} {usuario_gene.apellidos}"
+        nombre_completo_instructor = capitalizar(f"{usuario_gene.nombre} {usuario_gene.apellidos}")
 
         correo_instructor = usuario_gene.correo
         
-        hoja["T13"] = nombre_completo_instructor  # Instructor
+        hoja["T13"] = capitalizar(nombre_completo_instructor)  # Instructor
         hoja["U14"] = correo_instructor  # Correo
 
-        hoja["J13"] = informacion_adicional.trimestre
-        hoja["J14"] = informacion_adicional.jornada
-        hoja["R12"] = informacion_adicional.modalidad_formacion
+        hoja["J13"] = capitalizar(informacion_adicional.trimestre)
+        hoja["J14"] = capitalizar(informacion_adicional.jornada)
+        hoja["U12"] = capitalizar(informacion_adicional.modalidad_formacion)
 
-        hoja["H11"] = f"{informacion_adicional.nivel_formacion} {ficha.programa}"
-
-        hoja["E14"] = informacion_adicional.fecha_inicio_etapa_productiva
+        hoja["H11"] = capitalizar(f"{informacion_adicional.nivel_formacion} {ficha.programa}")
         
-
         fila_inicial = 18 # Los datos empiezan en la fila 18
         espacios_disponibles = 20 # La plantilla tiene 20 espacios
 
@@ -341,28 +341,28 @@ class FormatoService:
         # Datos del aprendiz
         hoja["C12"] = ap.tipo_documento
         hoja["D12"] = ap.documento
-        hoja["E12"] = f"{ap.nombre} {ap.apellido}"
+        hoja["E12"] = capitalizar(f"{ap.nombre} {ap.apellido}")
         hoja["F12"] = ap.celular
         hoja["G12"] = ap.correo
-        hoja["B14"] = ap.direccion
-        hoja["C14"] = ap.departamento
-        hoja["D14"] = ap.municipio
+        hoja["B14"] = capitalizar(ap.direccion)
+        hoja["C14"] = capitalizar(ap.departamento)
+        hoja["D14"] = capitalizar(ap.municipio)
 
         if ap.discapacidad == 'No':
             hoja["E14"] = "Si   (  )   No   ( X )"
         else:
             hoja["E14"] = "Si   ( X )   No   (  )"  
 
-        hoja["G14"] = ap.tipo_discapacidad
-        hoja["B17"] = "25 / CUNDINAMARCA"
-        hoja["C17"] = "9512 / CENTRO DE BIOTECNOLOGIA AGROPECUARIA"
+        hoja["G14"] = capitalizar(ap.tipo_discapacidad)
+        hoja["B17"] = "25 / Cundinamarca"
+        hoja["C17"] = "9512 / Centro De Biotecnología Agropecuaria"
         hoja["E17"] = request.ficha
-        hoja["F17"] = informacion_adicional.nivel_formacion
-        hoja["G17"] = ficha.programa
+        hoja["F17"] = capitalizar(informacion_adicional.nivel_formacion)
+        hoja["G17"] = capitalizar(ficha.programa)
         hoja["E19"] = "Selección de alternativa: ( X )"
         
-        hoja["B19"] = informacion_adicional.jornada
-        hoja["H17"] = informacion_adicional.modalidad_formacion
+        hoja["B19"] = capitalizar(informacion_adicional.jornada)
+        hoja["H17"] = capitalizar(informacion_adicional.modalidad_formacion)
 
         datos_fechas = {
             "C19": fecha_inicio,
@@ -389,8 +389,8 @@ class FormatoService:
         if imagen_path:
             try:
                 img = OpenpyxlImage(imagen_path)
-                img.width = 80
-                img.height = 30
+                img.width = 120
+                img.height = 50
                 hoja.add_image(img, "G30")  # Aquí va como string, no lista
             except Exception as e:
                 print(f"Error insertando imagen en hoja individual: {e}")
@@ -446,7 +446,7 @@ class FormatoService:
         if modalidad == "grupal":
             wb = self.generar_f165_grupal(ficha, aprendices, imagenes_procesadas, request, usuario_gene, informacion_adicional)
             nombre_original = f"F165_{request.ficha}_{request.modalidad}"
-            nombre_original = f"F165_{request.ficha}_{request.modalidad}"
+            print("este es el nombre del archivo", nombre_original)
             
         elif modalidad == "individual":
             wb = self.generar_f165_individual(ficha, aprendices, imagenes_procesadas, request, usuario_gene, informacion_adicional)
@@ -474,10 +474,6 @@ class FormatoService:
             hoja = wb["Selección Modificación Indiv"]
         else:
             raise Exception("Modalidad no válida")
-
-        hoja = wb["Selección formato - Grupal"]
-        hoja["H11"] = f"{informacion_adicional.nivel_formacion} - {ficha.programa}"
-        print(f"Max row: {hoja.max_row}, Max col: {hoja.max_column}")
 
         try:
             wb.save(stream)  
