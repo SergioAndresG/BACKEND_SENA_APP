@@ -149,6 +149,8 @@ async def obtener_aprendices(numero_ficha: str, db: Session = Depends(get_db)):
                     "direccion": aprendiz.direccion,
                     "tipo_documento": aprendiz.tipo_documento,
                     "estado": aprendiz.estado,
+                    "discapacidad": aprendiz.discapacidad,
+                    "tipo_discapacidad": aprendiz.tipo_discapacidad,
                     "firma": aprendiz.firma or "",
                     "editado": aprendiz.editado
                 })

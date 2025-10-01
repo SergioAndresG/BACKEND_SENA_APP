@@ -7,7 +7,6 @@ class LoginSchema(BaseModel):
 
     @validator('correo')
     def validate_email(cls, v):
-        # Prevenir inyecciones básicas en email
         dangerous_chars = ['<', '>', '"', "'", ';', '--', '/*', '*/', 'DROP', 'SELECT', 'INSERT', 'UPDATE', 'DELETE']
         email_upper = v.upper()
         for char in dangerous_chars:
@@ -25,7 +24,7 @@ class LoginSchema(BaseModel):
             raise ValueError('La contraseña debe contener al menos una letra minúscula')
         if not re.search(r'[0-9]', v):
             raise ValueError('La contraseña debe contener al menos un número')
-        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', v):
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>_-]', v):
             raise ValueError('La contraseña debe contener al menos un carácter especial')
         return v
     
@@ -37,6 +36,7 @@ class UserResponse(BaseModel):
     apellidos: str
     correo: str
 
+# El refresh_token ya no se envía en el cuerpo, se enviará en una cookie HttpOnly
 class Token(BaseModel):
     access_token: str
     token_type: str

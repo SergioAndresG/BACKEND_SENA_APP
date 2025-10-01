@@ -18,7 +18,7 @@ app = FastAPI(title="SENA - Procesador de Fichas")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # URLs de Vue
+    allow_origins=["http://localhost:5173"],  # URLs de Vue
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,15 +36,6 @@ app.add_middleware(SecurityMiddleware, max_requests_per_minute=100)
 
 
 base.metadata.create_all(bind=crear)
-
-@app.on_event("startup")
-async def startup():
-    print("🚀 FastAPI iniciado")
-    print("📁 Endpoints disponibles:")
-    print("   POST /upload-fichas/ - Subir archivos Excel")
-    print("   GET /status/{task_id} - Ver progreso")
-    print("   GET /fichas/ - Listar fichas")
-    print("   GET /ficha/{numero}/aprendices - Ver aprendices")
 
 if __name__ == "__main__":
     import uvicorn
