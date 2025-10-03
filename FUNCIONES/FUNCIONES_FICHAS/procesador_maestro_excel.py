@@ -31,8 +31,6 @@ class ProcesadorArchivoMaestro:
             if not columnas_necesarias:
                 raise ValueError("No se pudieron identificar las columnas necesarias en el archivo maestro")
 
-           
-
             df_limpio = df.select([
                 "IDENTIFICADOR_FICHA",
                 "FECHA_INICIO_FICHA",
@@ -68,7 +66,7 @@ class ProcesadorArchivoMaestro:
                     fecha_inicio = self._convertir_fecha(fila['fecha_inicio'])
                     fecha_fin = self._convertir_fecha(fila['fecha_fin'])
 
-                    # 🚀 UPSERT en tabla maestro
+                    # UPSERT en tabla maestro (Combinacion de Insertar y Actualizar)
                     ficha_maestro = self.session.query(FichaMaestro).filter(
                         FichaMaestro.numero_ficha == numero_ficha
                     ).first()

@@ -5,6 +5,7 @@ from MODELS import Usuarios
 from MODELS.token_blacklist import TokenBlacklist
 from SCHEMAS.login_schemas import LoginSchema, UserResponse
 from datetime import datetime, timedelta, timezone
+from MIDELWARE.security_middleware import InputSanitizer
 import logging
 from FUNCIONES.FUNCIONES_TOKENS.tokens_service import (
     create_access_token, 
@@ -36,8 +37,11 @@ async def login(response: Response, login_data: LoginSchema, db: Session = Depen
     # Log: mostramos quién intenta iniciar sesión
     logger.info(f"Intento de inicio de sesión para: {login_data.correo}")
     
+    # Satinizar la entrada antes de usarla
+    sanitized_correo = InputSanitizer.sanitize_string(login_data.correo)
+    
     # Verificar si el usuario existe en la base de datos
-    user = db.query(Usuarios).filter(Usuarios.correo == login_data.correo).first()
+    user = db.query(Usuarios).filter(Usuarios.correo == sanitized_correo).first()
     
     # Si el usuario no existe o la contraseña no coincide, devolvemos error
     if not user or not pwd_context.verify(login_data.contraseña, user.contraseña):

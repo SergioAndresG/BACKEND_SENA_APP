@@ -142,3 +142,15 @@ def obtener_historial(db: Session = Depends(get_db)):
         }
         for archivo in archivos
     ]
+
+@router_format.get("/descargar-archivo/{id_archivo}")
+def descargar_archivo(id_archivo: int, db: Session = Depends(get_db)):
+    archivo_descargar = db.query(ArchivoExcel).filter(ArchivoExcel.id == id_archivo).first()
+
+    ruta_completa = os.path.join(UPLOAD_DIR, archivo_descargar.ruta_archivo)
+    
+    return FileResponse(
+        path=ruta_completa,
+        filename=archivo_descargar.nombre_original,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
